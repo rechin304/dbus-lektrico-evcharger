@@ -1,5 +1,5 @@
 # D-Bus Lektrico Charger Integration
-This Python script integrates the Lektri.co EV Charger into Victron Energies Venus OS, allowing seamless communication between the charger and VictronOS. 
+This Python script integrates the Lektri.co EV Charger into Victron Energy Venus OS, allowing seamless communication between the charger and VictronOS. 
 
 ## Overview
 With the scripts in this repo it should be easy possible to install, uninstall, restart a service that connects the Lektri.co to the VenusOS and GX devices from Victron.
