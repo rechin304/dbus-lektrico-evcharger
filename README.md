@@ -101,6 +101,7 @@ Thats it 😄
 ![Letri.co Charger - Charging](img/Lektri_co_Charging.png)
 ![Victron Portal - Dashboard](img/VRM_Lektri_co_Overview.png)
 ![Victron Portal - Control](img/VRM_Lektri_co_Controls.png)
+![Victron Portal - Device List](img/VRM_Lektri_co_Devicelist.png)
 
 ## Used documentation
 - https://github.com/victronenergy/venus/wiki/dbus#evcharger   DBus paths for Victron namespace
