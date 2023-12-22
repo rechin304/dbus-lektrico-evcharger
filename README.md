@@ -107,3 +107,6 @@ Thats it 😄
 - https://github.com/victronenergy/venus/wiki/dbus#evcharger   DBus paths for Victron namespace
 - https://github.com/victronenergy/venus/wiki/dbus-api   DBus API from Victron
 - https://www.victronenergy.com/live/ccgx:root_access   How to get root access on GX device/Venus OS
+
+## Discusions on Victron Energy community
+https://community.victronenergy.com/questions/250582/lektrico-charging-station-integration-in-venus-os.html
