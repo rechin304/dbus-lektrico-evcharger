@@ -106,8 +106,3 @@ Thats it 😄
 - https://github.com/victronenergy/venus/wiki/dbus#evcharger   DBus paths for Victron namespace
 - https://github.com/victronenergy/venus/wiki/dbus-api   DBus API from Victron
 - https://www.victronenergy.com/live/ccgx:root_access   How to get root access on GX device/Venus OS
-
-
-## Discussions on the web
-This module/repository has been posted on the following threads:
-- https://community.victronenergy.com/questions/127339/shelly-1pm-as-pv-inverter-in-venusos.html
