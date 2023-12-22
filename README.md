@@ -26,12 +26,12 @@ After that call the install.sh script.
 
 The following script should do everything for you:
 ```
-wget https://github.com/rechin304/dbus-lektrico-evcharger.git
-unzip main.zip "dbus-lektrico-main/*" -d /data
-mv /data/dbus-lektrico-evcharger-main /data/dbus-lektrico-evcharger
+wget https://github.com/rechin304/dbus-lektrico-evcharger/archive/refs/tags/v12.01.zip
+unzip v12.01.zip "dbus-lektrico-evcharger-12.01/*" -d /data
+mv /data/dbus-lektrico-evcharger-12.01 /data/dbus-lektrico-evcharger
 chmod a+x /data/dbus-lektrico-evcharger/install.sh
 /data/dbus-lektrico-evcharger/install.sh
-rm main.zip
+rm v12.01.zip
 ```
 ⚠️ Check configuration after that - because service if is already installed an running and with wrong connection data (host) you will spam the log-file
 
