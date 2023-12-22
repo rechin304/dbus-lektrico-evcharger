@@ -1,16 +1,16 @@
 # D-Bus Lektrico Charger Integration
-This Python script integrates the Lektri.co EV Charger with D-Bus, allowing seamless communication between the charger and VictronOS. 
+This Python script integrates the Lektri.co EV Charger into Victron Energies Venus OS, allowing seamless communication between the charger and VictronOS. 
 
 ## Overview
 With the scripts in this repo it should be easy possible to install, uninstall, restart a service that connects the Lektri.co to the VenusOS and GX devices from Victron.
 Idea is inspired on @vikt0rm project and linked below.
 
 
-
 ## Inspiration
-This project is my first with the Victron Venus OS, so I took some ideas and approaches from the following projects - many thanks for sharing the knowledge:
+This project is my first with the Victron Venus OS, so I took some ideas and approaches from the following projects: 
 - https://github.com/vikt0rm/dbus-goecharger
 - https://github.com/victronenergy/venus/wiki/dbus#pv-inverters
+Many thanks for sharing the knowledge.
 
 ## How it works
 
@@ -20,11 +20,13 @@ This project is my first with the Victron Venus OS, so I took some ideas and app
 
 ## Installation
 Get the code
-Just grap a copy of the main branche and copy them to a folder under /data/ e.g. /data/dbus-goecharger. After that call the install.sh script.
+
+Just grap a copy of the main branche and copy them to a folder under /data/ e.g. /data/dbus-letrico-evcharger. 
+After that call the install.sh script.
 
 The following script should do everything for you:
 ```
-wget 
+wget https://github.com/rechin304/dbus-lektrico-evcharger.git
 unzip main.zip "dbus-lektrico-main/*" -d /data
 mv /data/dbus-lektrico-evcharger-main /data/dbus-lektrico-evcharger
 chmod a+x /data/dbus-lektrico-evcharger/install.sh
@@ -71,6 +73,7 @@ rm main.zip
 Charging modes
 
 | Lektri.co | Victron |
+ ------------- | ------------- |
 | Power | Scheduled Charging |
 | Hybrid | Manual |
 | Green | Auto |
@@ -93,45 +96,11 @@ So what is the script doing:
 Thats it 😄
 
 ### Pictures
-![Tile Overview](img/venus-os-tile-overview.PNG)
-![Remote Console - Overview](img/venus-os-remote-console-overview.PNG) 
-![SmartMeter - Values](img/venus-os-shelly1pm-pvinverter.PNG)
-![SmartMeter - Device Details](img/venus-os-shelly1pm-pvinverter-devicedetails.PNG)
-
-
-## Install & Configuration
-### Get the code
-Just grap a copy of the main branche and copy them to a folder under `/data/` e.g. `/data/dbus-shelly-em-pvinverter`.
-After that call the install.sh script.
-
-The following script should do everything for you:
-```
-wget https://github.com/Eddy0815/dbus-shelly-em-pvinverter/archive/refs/tags/main.zip
-unzip main.zip "dbus-shelly-em-pvinverter-main/*" -d /data
-mv /data/dbus-shelly-em-pvinverter-main /data/dbus-shelly-em-pvinverter
-chmod a+x /data/dbus-shelly-em-pvinverter/install.sh
-/data/dbus-shelly-em-pvinverter/install.sh
-rm main.zip
-```
-⚠️ Check configuration after that - because service is already installed an running and with wrong connection data (host, username, pwd) you will spam the log-file
-
-### Change config.ini
-Within the project there is a file `/data/dbus-shelly-em-pvinverter/config.ini` - just change the values - most important is the deviceinstance, custom name and phase under "DEFAULT" and host, username and password in section "ONPREMISE". More details below:
-
-| Section  | Config vlaue | Explanation |
-| ------------- | ------------- | ------------- |
-| DEFAULT  | AccessType | Fixed value 'OnPremise' |
-| DEFAULT  | SignOfLifeLog  | Time in minutes how often a status is added to the log-file `current.log` with log-level INFO |
-| DEFAULT  | Deviceinstance | Unique ID identifying the shelly 1pm in Venus OS |
-| DEFAULT  | CustomName | Name shown in Remote Console (e.g. name of pv inverter) |
-| DEFAULT  | Phase | Valid values L1, L2 or L3: represents the phase where pv inverter is feeding in |
-| DEFAULT  | Role | Roles pvinverter, evcharger, grid|
-
-| ONPREMISE  | Host | IP or hostname of on-premise Shelly EM web-interface |
-| ONPREMISE  | Username | Username for htaccess login - leave blank if no username/password required |
-| ONPREMISE  | Password | Password for htaccess login - leave blank if no username/password required |
-
-
+![Remote Console - Device List](img/Device-List.png)
+![Letri.co Charger - Device](img/Lektri_co.png)
+![Letri.co Charger - Charging](img/Lektri_co_Charging.png)
+![Victron Portal - Dashboard](img/VRM_Lektri_co_Overview.png)
+![Victron Portal - Control](img/VRM_Lektri_co_Controls.png)
 
 ## Used documentation
 - https://github.com/victronenergy/venus/wiki/dbus#evcharger   DBus paths for Victron namespace
