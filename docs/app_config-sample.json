@@ -1,0 +1,14 @@
+{
+  "breaker_rating": 25,
+  "load_balancing_mode": 3,
+  "lb_meter_type": "Onboard",
+  "lb_pv_minimum_current": 6,
+  "reverse_current": true,
+  "energy_management_enabled": false,
+  "lb_hybrid_current": 6,
+  "lb_meter_offline_current": 6,
+  "car_minimum_current": 6,
+  "auto_update": true,
+  "chargers_list": "",
+  "owner_id": ""
+}
