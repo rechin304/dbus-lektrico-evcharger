@@ -1,4 +1,4 @@
-# D-Bus Lektrico Charger Integration
+# dbus Victron Lektrico Charger Integration
 This Python script integrates the Lektri.co EV Charger into Victron Energy Venus OS, allowing seamless communication between the charger and VictronOS. 
 
 ## Overview
