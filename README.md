@@ -73,8 +73,8 @@ Charging modes
 
 | Lektri.co | Victron |
  ------------- | ------------- |
-| Power | Scheduled Charging |
-| Hybrid | Manual |
+| Power | Manual |
+| Hybrid | Scheduled Charging |
 | Green | Auto |
 
 ## Contributing

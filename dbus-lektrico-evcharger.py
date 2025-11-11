@@ -167,7 +167,7 @@ class DbusLektricoService:
                 logging.warning(f"Lektri.co parameter {param_name} not set to {value}")
                 return False
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Error setting Lektri.co parameter {parameter} to {value}: {e}")
+            logging.warning(f"Error setting Lektri.co parameter {param_name} to {value}: {e}")
             return False
             
     def _getLektricoEMStatusUrl(self):
@@ -214,8 +214,8 @@ class DbusLektricoService:
     def _setLektricoChargerMode(self, mode):
         logging.info("Setting EV Charger mode to: %s" % mode)
         # Map your mode values to the expected values
-        mode_mapping = {0: '2', 1: '3', 2: '1'}
-        mapped_mode = mode_mapping.get(mode, '2')  # Default to mode '2' if not found
+        mode_mapping = {0: '3', 1: '2', 2: '1'}
+        mapped_mode = mode_mapping.get(mode, '3')  # Default to mode '3' if not found
         try:
             method = 'app_config.set'
             config_key = 'load_balancing_mode'
@@ -320,9 +320,9 @@ class DbusLektricoService:
                 self._dbusservice['/ChargingTime'] = int(data['charging_time'])
                 mode = 0
                 if str(em_data['load_balancing_mode']) == '2':
-                    mode = 0
-                elif str(em_data['load_balancing_mode']) == '3':
                     mode = 1
+                elif str(em_data['load_balancing_mode']) == '3':
+                    mode = 0
                 elif str(em_data['load_balancing_mode']) == '1':
                     mode = 2
                 self._dbusservice['/Mode'] = mode
