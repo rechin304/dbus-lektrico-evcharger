@@ -45,8 +45,7 @@ rm v12.01.zip
 | ------------- | ------------- | ------------- |
 | DEFAULT  | AccessType | Fixed value 'OnPremise' |
 | DEFAULT  | SignOfLifeLog  | Time in minutes how often a status is added to the log-file `current.log` with log-level INFO |
-| DEFAULT  | Deviceinstance | Unique ID identifying the shelly 1pm in Venus OS || DEFAULT  | Phase | Valid values L1, L2 or L3: represents the phase where pv inverter is feeding in |
-
+| DEFAULT  | Deviceinstance | Unique ID identifying the Lektri.co in Venus OS |
 | ONPREMISE  | Host | IP or hostname of on-premise Lektri.co web-interface |
 | ONPREMISE  | EM_Host | IP or hostname of on-premise Lektri.co EM web-interface |
 
@@ -107,3 +106,6 @@ Thats it 😄
 - https://github.com/victronenergy/venus/wiki/dbus#evcharger   DBus paths for Victron namespace
 - https://github.com/victronenergy/venus/wiki/dbus-api   DBus API from Victron
 - https://www.victronenergy.com/live/ccgx:root_access   How to get root access on GX device/Venus OS
+
+## Discusions on Victron Energy community
+https://community.victronenergy.com/questions/250582/lektrico-charging-station-integration-in-venus-os.html
