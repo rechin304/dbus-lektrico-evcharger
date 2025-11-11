@@ -1,0 +1,7 @@
+2023-12-21 21:31:43,345 root INFO Start
+2023-12-21 21:31:43,431 root INFO registered ourselves on D-Bus as com.victronenergy.evcharger.http_43
+2023-12-21 21:31:43,801 root INFO Connected to dbus, and switching over to gobject.MainLoop() (= event based)
+2023-12-21 21:32:43,948 root INFO --- Start: sign of life ---
+2023-12-21 21:32:43,950 root INFO Last _update() call: 1703194363.9481025
+2023-12-21 21:32:43,952 root INFO Last '/Ac/Power': 1189
+2023-12-21 21:32:43,953 root INFO --- End: sign of life ---
