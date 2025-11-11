@@ -26,7 +26,7 @@ class DbusLektricoService:
         deviceinstance = int(config['DEFAULT']['Deviceinstance'])
         hardwareVersion = int(config['DEFAULT']['HardwareVersion'])
 
-        self._dbusservice = VeDbusService("{}.http_{:02d}".format(servicename, deviceinstance))
+        self._dbusservice = VeDbusService("{}.http_{:02d}".format(servicename, deviceinstance), register=False)
         self._paths = paths
 
         logging.debug("%s /DeviceInstance = %d" % (servicename, deviceinstance))
@@ -66,6 +66,9 @@ class DbusLektricoService:
             self._dbusservice.add_path(
                 path, settings['initial'], gettextcallback=settings['textformat'], writeable=True,
                 onchangecallback=self._handlechangedvalue)
+
+        # Register the service on D-Bus after adding all paths
+        self._dbusservice.register()
 
         # last update
         self._lastUpdate = 0
@@ -214,8 +217,10 @@ class DbusLektricoService:
     def _setLektricoChargerMode(self, mode):
         logging.info("Setting EV Charger mode to: %s" % mode)
         # Map your mode values to the expected values
-        mode_mapping = {0: '3', 1: '2', 2: '1'}
-        mapped_mode = mode_mapping.get(mode, '3')  # Default to mode '3' if not found
+        # Victron: 0=Manual, 1=Auto, 2=Scheduled Charging
+        # Lektrico: 1=Green, 2=Power, 3=Hybrid
+        mode_mapping = {0: '2', 1: '1', 2: '3'}  # Manual→Power, Auto→Green, Scheduled→Hybrid
+        mapped_mode = mode_mapping.get(mode, '2')  # Default to Power if not found
         try:
             method = 'app_config.set'
             config_key = 'load_balancing_mode'
@@ -319,12 +324,12 @@ class DbusLektricoService:
                 self._dbusservice['/MaxCurrent'] = int(data['dynamic_current'])
                 self._dbusservice['/ChargingTime'] = int(data['charging_time'])
                 mode = 0
-                if str(em_data['load_balancing_mode']) == '2':
-                    mode = 1
-                elif str(em_data['load_balancing_mode']) == '3':
-                    mode = 0
-                elif str(em_data['load_balancing_mode']) == '1':
-                    mode = 2
+                if str(em_data['load_balancing_mode']) == '3':  # Green
+                    mode = 1  # Auto
+                elif str(em_data['load_balancing_mode']) == '1':  # Power
+                    mode = 0  # Manual
+                elif str(em_data['load_balancing_mode']) == '2':  # Hybrid
+                    mode = 2  # Scheduled Charging
                 self._dbusservice['/Mode'] = mode
                 self._dbusservice['/MCU/Temperature'] = int(data['temperature'])
                 
