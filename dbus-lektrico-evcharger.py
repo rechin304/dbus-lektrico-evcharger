@@ -139,13 +139,16 @@ class DbusLektricoService:
                 }
                 
             else:
+                # Ensure numeric values are integers for Lektrico API
+                if param_name == 'dynamic_current' and isinstance(value, (int, float)):
+                    value = int(value)
+                
                 payload = {
                     "src": "VenusOS",
                     "id": random.randint(10000000, 99999999),
                     "method": method,
                     "params": {param_name: value} if param_name else {}
-                }           
-            #logging.info("URL: %s" % (URL))
+                }
         else:
             raise ValueError("AccessType %s is not supported" % (config['DEFAULT']['AccessType']))
 
