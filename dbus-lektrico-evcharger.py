@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
-# import normal packages
 import platform
 import logging
 import sys
 import os
 import time
-import requests  # for http GET
-import configparser  # for config/ini file
+import requests
+import configparser
 import random
+import dbus
+import traceback
 
-# our own packages from victron
+# Victron packages
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '/opt/victronenergy/dbus-systemcalc-py/ext/velib_python'))
 from vedbus import VeDbusService
 
@@ -28,6 +29,13 @@ class DbusLektricoService:
 
         self._dbusservice = VeDbusService("{}.http_{:02d}".format(servicename, deviceinstance), register=False)
         self._paths = paths
+        self._updating = False  # Flag to prevent feedback loops during state updates
+        self._last_start_stop_from_charger = None  # Track last value read from charger
+        self._last_set_current_from_charger = None  # Track last current value read from charger
+        self._last_mode_from_charger = None  # Track last mode value read from charger
+        self._restarting_after_change = False  # Flag to prevent stop commands during auto-restart
+        self._last_user_start_stop_command = None  # Track last command sent by user
+        self._last_user_start_stop_time = 0  # Track when last user command was sent
 
         logging.debug("%s /DeviceInstance = %d" % (servicename, deviceinstance))
 
@@ -73,11 +81,8 @@ class DbusLektricoService:
         # last update
         self._lastUpdate = 0
 
-        # charging time in float
-        self._chargingTime = 0.0
-
         # add _update function 'timer'
-        gobject.timeout_add(250, self._update)  # pause 250ms before the next request
+        gobject.timeout_add(250, self._update)
 
         # add _signOfLife 'timer' to get feedback in log every 5 minutes
         gobject.timeout_add(self._getSignOfLifeInterval() * 60 * 1000, self._signOfLife)
@@ -148,29 +153,23 @@ class DbusLektricoService:
 
     def _setLektricoChargerValue(self, method, value, param_name=None):
         URL, payload = self._getLektricoChargerPayloadUrl(method, value, param_name)
-        #logging.info("setLektricoChargerValue URL: %s" % (URL))
-        logging.info("setLektricoChargerValue Payload: %s" % (payload))
+        logging.debug("Sending to Lektrico: %s" % method)
         
         try:
             request_data = requests.post(url=URL, json=payload)
             request_data.raise_for_status()
-
             json_data = request_data.json()
-            # Log the response for debugging
-            logging.info("Response from server: %s", json_data)
 
-            # check for Json
             if not json_data:
                 raise ValueError("Converting response to JSON failed")
 
             if 'result' in json_data and json_data['result'] is True:
                 return True
             else:
-                #logging.warning(f"Lektri.co parameter {parameter} not set to {value}")
-                logging.warning(f"Lektri.co parameter {param_name} not set to {value}")
+                logging.warning(f"Lektrico parameter {param_name} not set to {value}")
                 return False
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Error setting Lektri.co parameter {param_name} to {value}: {e}")
+            logging.warning(f"Error setting Lektrico parameter {param_name} to {value}: {e}")
             return False
             
     def _getLektricoEMStatusUrl(self):
@@ -215,59 +214,52 @@ class DbusLektricoService:
         return json_data
         
     def _setLektricoChargerMode(self, mode):
-        logging.info("Setting EV Charger mode to: %s" % mode)
         # Map Victron mode values to Lektrico values
-        # Desired: Manual→Power, Auto→Green, Scheduled→Hybrid
         # Lektrico modes: 1=Green, 2=Power, 3=Hybrid
-        # But observed shift: send value appears to shift+1, so compensate
-        mode_mapping = {0: 1, 1: 3, 2: 2}  # Manual→3(becomes Hybrid), Auto→1(becomes Power), Scheduled→2(becomes Green)
-        mapped_mode = mode_mapping.get(mode, 2)  # Default to Hybrid if not found
+        mode_mapping = {0: 1, 1: 3, 2: 2}  # Manual→Green, Auto→Hybrid, Scheduled→Power
+        mapped_mode = mode_mapping.get(mode, 2)
         
-        logging.info("Mapping Victron mode %s to Lektrico mode %s" % (mode, mapped_mode))
+        logging.info("Setting charger mode to %s (Lektrico mode: %s)" % (mode, mapped_mode))
+        
+        # Remember if charger was charging before mode change
+        was_charging = self._dbusservice['/StartStop'] == 1
         
         try:
-            method = 'app_config.set'
-            config_key = 'load_balancing_mode'
-            config_value = mapped_mode  # Send as integer, not string
-            
             payload = {
-            "src": "HASS",
-            "id": random.randint(10000000, 99999999),
-            "method": method,
-            "params": {"config_key": config_key, "config_value": config_value}
+                "src": "HASS",
+                "id": random.randint(10000000, 99999999),
+                "method": 'app_config.set',
+                "params": {"config_key": 'load_balancing_mode', "config_value": mapped_mode}
             }
             
             URL = self._setLektricoEMUrl()
-            
-            logging.info("setLektricoChargerMode Payload: %s" % (payload))
-            
             request_data = requests.post(url=URL, json=payload)
             request_data.raise_for_status()
-
             json_data = request_data.json()
-            # Log the response for debugging
-            logging.info("Response from server: %s", json_data)
             
-            # check for Json
             if not json_data:
                 raise ValueError("Converting response to JSON failed")
                 
             if 'result' in json_data and json_data['result'] is True:
-                logging.info("Mode change successful - waiting 1 second for EM to update...")
-                time.sleep(1)
-                # Verify the change by reading back
-                em_data_verify = self._getLektricoEMData()
-                if em_data_verify:
-                    actual_mode = em_data_verify.get('load_balancing_mode')
-                    logging.info("Verified EM mode after change: %s (expected: %s)" % (actual_mode, config_value))
+                time.sleep(1)  # Wait for EM to update
+                
+                # If charger was charging before mode change, restart it
+                if was_charging:
+                    logging.info("Restarting charge after mode change")
+                    restart_result = self._setLektricoChargerValue('charge.start', 1)
+                    if restart_result:
+                        self._last_start_stop_from_charger = 1
+                    else:
+                        logging.warning("Failed to resume charging after mode change")
+                    self._restarting_after_change = False
+                
                 return True
             else:
-                logging.warning(f"Lektri.co parameter {config_key} not set to {config_value}")
+                logging.warning(f"Mode not set to {mapped_mode}")
                 return False
         
-        
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Error setting EV Charger mode: {e}")
+            logging.warning(f"Error setting mode: {e}")
             return False
         
     def _getLektricoChargerData(self):
@@ -317,89 +309,186 @@ class DbusLektricoService:
 
     def _update(self):
         try:
-            # get data from LektricoCharger
             data = self._getLektricoChargerData()
             em_data = self._getLektricoEMData()
 
             if data is not None:
-                # send data to DBus
+                self._updating = True
+                
+                # Update power and energy values
                 self._dbusservice['/Ac/L1/Power'] = int(data['instant_power'])
                 self._dbusservice['/Ac/Power'] = int(data['instant_power'])
                 self._dbusservice['/Ac/Voltage'] = int(data['voltage'])
                 self._dbusservice['/Current'] = int(data['current'])
-                power_watts = float(data['session_energy'])/1000
-                self._dbusservice['/Ac/Energy/Forward'] = power_watts
-                #logging.info("Received power data: %s W" % power_watts)
+                self._dbusservice['/Ac/Energy/Forward'] = float(data['session_energy'])/1000
                 
-                self._dbusservice['/SetCurrent'] = int(data['dynamic_current'])
-                self._dbusservice['/MaxCurrent'] = int(data['dynamic_current'])
+                # Update current - log only if changed
+                charger_dynamic_current = int(data['dynamic_current'])
+                if self._last_set_current_from_charger is not None and charger_dynamic_current != self._last_set_current_from_charger:
+                    logging.info("Current changed: %d → %dA" % (self._last_set_current_from_charger, charger_dynamic_current))
+                
+                self._last_set_current_from_charger = charger_dynamic_current
+                self._dbusservice['/SetCurrent'] = charger_dynamic_current
+                self._dbusservice['/MaxCurrent'] = charger_dynamic_current
                 self._dbusservice['/ChargingTime'] = int(data['charging_time'])
-                mode = 0
-                if str(em_data['load_balancing_mode']) == '3':  # Green
-                    mode = 1  # Auto
-                elif str(em_data['load_balancing_mode']) == '1':  # Power
-                    mode = 0  # Manual
-                elif str(em_data['load_balancing_mode']) == '2':  # Hybrid
-                    mode = 2  # Scheduled Charging
+                
+                # Map Lektrico mode to Victron mode
+                mode_mapping = {'3': 1, '1': 0, '2': 2}  # Green→Auto, Power→Manual, Hybrid→Scheduled
+                mode = mode_mapping.get(str(em_data['load_balancing_mode']), 0)
+                
+                # Log only mode changes
+                if self._last_mode_from_charger is not None and mode != self._last_mode_from_charger:
+                    logging.info("Mode changed: %d → %d" % (self._last_mode_from_charger, mode))
+                
+                self._last_mode_from_charger = mode
                 self._dbusservice['/Mode'] = mode
                 self._dbusservice['/MCU/Temperature'] = int(data['temperature'])
                 
-                status = 0
-                if str(data['charger_state']) == 'A':
-                    status = 0
-                elif str(data['charger_state']) == 'B':
-                    status = 1
-                elif str(data['charger_state']) == 'C':
-                    status = 2
-                elif str(data['charger_state']) == 'D':
-                    status = 3
+                # Map charger state to status
+                state_mapping = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
+                status = state_mapping.get(str(data['charger_state']), 0)
                 self._dbusservice['/Status'] = status
                 
+                # Map status to start/stop (only C=charging means started)
+                new_start_stop = 1 if status == 2 else 0
                 
-                start_stop_mapping = {0: 0, 1: 0, 2: 1, 3: 0}
-                self._dbusservice['/StartStop'] = start_stop_mapping.get(status, 0)
-                logging.debug("Start/Stop : %s" % (self._dbusservice['/StartStop']))
+                # Log only state changes
+                if new_start_stop != self._dbusservice['/StartStop']:
+                    logging.info("Charger state changed: %s → /StartStop=%d" % (data['charger_state'], new_start_stop))
                 
-                logging.debug("Wallbox Consumption (/Ac/Power): %s" % (self._dbusservice['/Ac/Power']))
-                logging.debug("Wallbox Forward (/Ac/Energy/Forward): %s" % (self._dbusservice['/Ac/Energy/Forward']))
-                logging.debug("---")
+                self._last_start_stop_from_charger = new_start_stop
+                self._dbusservice['/StartStop'] = new_start_stop
 
-                index = self._dbusservice['/UpdateIndex'] + 1
-                if index > 255:
-                    index = 0
+                # Update index
+                index = (self._dbusservice['/UpdateIndex'] + 1) % 256
                 self._dbusservice['/UpdateIndex'] = index
-
                 self._lastUpdate = time.time()
+                self._updating = False
             else:
-                logging.debug("Wallbox is not available")
+                logging.debug("Charger not available")
+                self._updating = False
 
         except Exception as e:
-            logging.critical('Error at %s', '_update', exc_info=e)
+            logging.critical('Error in _update', exc_info=e)
+            self._updating = False
 
         return True
 
     def _handlechangedvalue(self, path, value):
-        logging.info("Someone updated %s to %s" % (path, value))
+        # Ignore changes during state updates to prevent feedback loops
+        if self._updating or self._restarting_after_change:
+            logging.debug("Ignoring %s change during update/restart" % path)
+            return True
+        
+        # Try to identify the D-Bus sender (for debugging external control)
+        sender_info = self._get_dbus_sender()
+        if sender_info:
+            logging.info("D-Bus change: %s=%s from %s" % (path, value, sender_info))
+        
+        # For StartStop, ignore if this is the same value we just read from the charger
+        if path == '/StartStop' and self._last_start_stop_from_charger is not None:
+            if value == self._last_start_stop_from_charger:
+                logging.debug("Ignoring /StartStop - matches charger state")
+                return True
+            else:
+                # Check if this is a delayed callback from recent user command
+                time_since_last_command = time.time() - self._last_user_start_stop_time
+                if self._last_user_start_stop_command == value and time_since_last_command < 5.0:
+                    logging.debug("Ignoring /StartStop - delayed callback")
+                    self._last_start_stop_from_charger = value
+                    return True
+                
+                logging.info("/StartStop changed: %s → %s%s" % 
+                            (self._last_start_stop_from_charger, value, 
+                             " (external)" if sender_info else ""))
+                self._last_start_stop_from_charger = None
+        
+        # For SetCurrent, ignore if matches charger state
+        if path == '/SetCurrent' and self._last_set_current_from_charger is not None:
+            if value == self._last_set_current_from_charger:
+                logging.debug("Ignoring /SetCurrent - matches charger state")
+                return True
+            else:
+                logging.info("/SetCurrent changed: %s → %sA" % (self._last_set_current_from_charger, value))
+                self._last_set_current_from_charger = None
+        
+        # For Mode, ignore if matches charger state
+        if path == '/Mode' and self._last_mode_from_charger is not None:
+            if value == self._last_mode_from_charger:
+                logging.debug("Ignoring /Mode - matches charger state")
+                return True
+            else:
+                logging.info("/Mode changed: %s → %s" % (self._last_mode_from_charger, value))
+                self._last_mode_from_charger = None
            
         if path == '/StartStop':
-            logging.info("/StartStop value %s" % (value))
-            #return self._setLektricoChargerValue('StartStop', value)                                            
+            self._last_user_start_stop_command = value
+            self._last_user_start_stop_time = time.time()
             return self._setLektricoChargerValue('charge.start' if value == 1 else 'charge.stop', value)            
             
         elif path == '/SetCurrent':
-            logging.info("/SetCurrent value %s" % (value))
-            return self._setLektricoChargerValue('dynamic_current.set', value, param_name='dynamic_current')
+            was_charging = self._dbusservice['/StartStop'] == 1
+            if was_charging:
+                self._restarting_after_change = True
+            
+            result = self._setLektricoChargerValue('dynamic_current.set', value, param_name='dynamic_current')
+            if result:
+                self._last_set_current_from_charger = value
+                
+                if was_charging:
+                    time.sleep(0.5)
+                    restart_result = self._setLektricoChargerValue('charge.start', 1)
+                    if restart_result:
+                        self._last_start_stop_from_charger = 1
+                    self._restarting_after_change = False
+            else:
+                self._restarting_after_change = False
+                
+            return result
             
         elif path == '/Mode':
-            logging.info("/Mode value %s" % (value))
-            return self._setLektricoChargerMode(value)
+            was_charging = self._dbusservice['/StartStop'] == 1
+            if was_charging:
+                self._restarting_after_change = True
+            
+            result = self._setLektricoChargerMode(value)
+            if result:
+                self._last_mode_from_charger = value
+            
+            self._restarting_after_change = False
+            return result
             
         elif path == '/EnableDisplay':
-        # Example: set EnableDisplay to 1 (control enabled)
             return self._setLektricoChargerValue('/EnableDisplay', 1)
         else:
-            logging.info("Mapping for evcharger path %s does not exist" % (path))
+            logging.warning("Unknown path: %s" % path)
             return False
+
+    def _get_dbus_sender(self):
+        """Get D-Bus sender information for debugging external control"""
+        try:
+            msg = dbus.lowlevel.get_calling_message()
+            if msg:
+                sender = msg.get_sender()
+                bus = dbus.SystemBus()
+                pid = bus.get_unix_process_id(sender)
+                
+                # Try to find service name
+                dbus_obj = bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
+                dbus_iface = dbus.Interface(dbus_obj, 'org.freedesktop.DBus')
+                names = dbus_iface.ListNames()
+                for name in names:
+                    if not name.startswith(':'):
+                        try:
+                            owner = dbus_iface.GetNameOwner(name)
+                            if owner == sender:
+                                return "%s (PID:%s)" % (name, pid)
+                        except:
+                            pass
+                return "PID:%s" % pid
+        except Exception as e:
+            logging.debug("Could not identify D-Bus sender: %s" % e)
+        return None
 
 
 def main():
