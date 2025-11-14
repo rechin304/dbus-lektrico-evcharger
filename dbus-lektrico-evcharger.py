@@ -216,15 +216,19 @@ class DbusLektricoService:
         
     def _setLektricoChargerMode(self, mode):
         logging.info("Setting EV Charger mode to: %s" % mode)
-        # Map your mode values to the expected values
-        # Victron: 0=Manual, 1=Auto, 2=Scheduled Charging
-        # Lektrico: 1=Green, 2=Power, 3=Hybrid
-        mode_mapping = {0: '2', 1: '1', 2: '3'}  # Manual→Power, Auto→Green, Scheduled→Hybrid
-        mapped_mode = mode_mapping.get(mode, '2')  # Default to Power if not found
+        # Map Victron mode values to Lektrico values
+        # Desired: Manual→Power, Auto→Green, Scheduled→Hybrid
+        # Lektrico modes: 1=Green, 2=Power, 3=Hybrid
+        # But observed shift: send value appears to shift+1, so compensate
+        mode_mapping = {0: 1, 1: 3, 2: 2}  # Manual→3(becomes Hybrid), Auto→1(becomes Power), Scheduled→2(becomes Green)
+        mapped_mode = mode_mapping.get(mode, 2)  # Default to Hybrid if not found
+        
+        logging.info("Mapping Victron mode %s to Lektrico mode %s" % (mode, mapped_mode))
+        
         try:
             method = 'app_config.set'
             config_key = 'load_balancing_mode'
-            config_value = mapped_mode
+            config_value = mapped_mode  # Send as integer, not string
             
             payload = {
             "src": "HASS",
@@ -249,6 +253,13 @@ class DbusLektricoService:
                 raise ValueError("Converting response to JSON failed")
                 
             if 'result' in json_data and json_data['result'] is True:
+                logging.info("Mode change successful - waiting 1 second for EM to update...")
+                time.sleep(1)
+                # Verify the change by reading back
+                em_data_verify = self._getLektricoEMData()
+                if em_data_verify:
+                    actual_mode = em_data_verify.get('load_balancing_mode')
+                    logging.info("Verified EM mode after change: %s (expected: %s)" % (actual_mode, config_value))
                 return True
             else:
                 logging.warning(f"Lektri.co parameter {config_key} not set to {config_value}")
