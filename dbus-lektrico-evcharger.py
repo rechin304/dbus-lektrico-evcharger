@@ -323,8 +323,10 @@ class DbusLektricoService:
                 self._dbusservice['/Ac/Power'] = int(data['instant_power'])
                 self._dbusservice['/Ac/Voltage'] = int(data['voltage'])
                 self._dbusservice['/Current'] = int(data['current'])
-                self._dbusservice['/Ac/Energy/Forward'] = float(data['session_energy'])/1000
-                
+                # self._dbusservice['/Ac/Energy/Forward'] = float(data['session_energy'])/1000
+                self._dbusservice['/Session/Energy'] = float(data['session_energy'])/1000
+                self._dbusservice['/Ac/Energy/Forward'] = float(data['total_charged_energy'])
+
                 # Update current - log only if changed
                 charger_dynamic_current = int(data['dynamic_current'])
                 if self._last_set_current_from_charger is not None and charger_dynamic_current != self._last_set_current_from_charger:
@@ -526,6 +528,7 @@ def main():
                 '/Ac/L2/Power': {'initial': 0, 'textformat': _w},
                 '/Ac/L3/Power': {'initial': 0, 'textformat': _w},
                 '/Ac/Energy/Forward': {'initial': 0, 'textformat': _kwh},
+                '/Session/Energy': {'initial': 0, 'textformat': _kwh},
                 '/ChargingTime': {'initial': 0, 'textformat': _s},
 
                 '/Ac/Voltage': {'initial': 0, 'textformat': _v},
