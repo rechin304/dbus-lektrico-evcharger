@@ -323,7 +323,6 @@ class DbusLektricoService:
                 self._dbusservice['/Ac/Power'] = int(data['instant_power'])
                 self._dbusservice['/Ac/Voltage'] = int(data['voltage'])
                 self._dbusservice['/Current'] = int(data['current'])
-                # self._dbusservice['/Ac/Energy/Forward'] = float(data['session_energy'])/1000
                 self._dbusservice['/Session/Energy'] = float(data['session_energy'])/1000
                 self._dbusservice['/Ac/Energy/Forward'] = float(data['total_charged_energy'])
 
