@@ -26,6 +26,12 @@ class DbusLektricoService:
         config = self._getConfig()
         deviceinstance = int(config['DEFAULT']['Deviceinstance'])
         hardwareVersion = int(config['DEFAULT']['HardwareVersion'])
+        self._position = int(config['DEFAULT'].get('Position', 0))
+        self._autostart = int(config['DEFAULT'].get('AutoStart', 0))
+        if '/Position' in paths:
+            paths['/Position']['initial'] = self._position
+        if '/AutoStart' in paths:
+            paths['/AutoStart']['initial'] = self._autostart
 
         self._dbusservice = VeDbusService("{}.http_{:02d}".format(servicename, deviceinstance), register=False)
         self._paths = paths
@@ -323,6 +329,7 @@ class DbusLektricoService:
                 self._dbusservice['/Ac/Power'] = int(data['instant_power'])
                 self._dbusservice['/Ac/Voltage'] = int(data['voltage'])
                 self._dbusservice['/Current'] = int(data['current'])
+                # self._dbusservice['/Ac/Energy/Forward'] = float(data['session_energy'])/1000
                 self._dbusservice['/Session/Energy'] = float(data['session_energy'])/1000
                 self._dbusservice['/Ac/Energy/Forward'] = float(data['total_charged_energy'])
 
@@ -464,6 +471,36 @@ class DbusLektricoService:
             
         elif path == '/EnableDisplay':
             return self._setLektricoChargerValue('/EnableDisplay', 1)
+        elif path == '/Position':
+            try:
+                val = int(value)
+                self._dbusservice['/Position'] = val
+                self._position = val
+                config = self._getConfig()
+                config['DEFAULT']['Position'] = str(val)
+                cfg_path = "%s/config.ini" % (os.path.dirname(os.path.realpath(__file__)))
+                with open(cfg_path, 'w') as f:
+                    config.write(f)
+                logging.info("/Position changed to %d and saved to config.ini" % val)
+                return True
+            except Exception as e:
+                logging.error("Failed to update /Position: %s" % e)
+                return False
+        elif path == '/AutoStart':
+            try:
+                val = int(value)
+                self._dbusservice['/AutoStart'] = val
+                self._autostart = val
+                config = self._getConfig()
+                config['DEFAULT']['AutoStart'] = str(val)
+                cfg_path = "%s/config.ini" % (os.path.dirname(os.path.realpath(__file__)))
+                with open(cfg_path, 'w') as f:
+                    config.write(f)
+                logging.info("/AutoStart changed to %d and saved to config.ini" % val)
+                return True
+            except Exception as e:
+                logging.error("Failed to update /AutoStart: %s" % e)
+                return False
         else:
             logging.warning("Unknown path: %s" % path)
             return False
@@ -536,7 +573,9 @@ def main():
                 '/MaxCurrent': {'initial': 0, 'textformat': _a},
                 '/MCU/Temperature': {'initial': 0, 'textformat': _degC},
                 '/StartStop': {'initial': 0, 'textformat': lambda p, v: (str(v))},
-                '/Mode': {'initial': 0, 'textformat': lambda p, v: (str(v))}
+                '/Mode': {'initial': 0, 'textformat': lambda p, v: (str(v))},
+                '/Position': {'initial': 0, 'textformat': lambda p, v: ('AC Input' if v == 0 else ('AC Output' if v == 1 else 'Unknown'))},
+                '/AutoStart': {'initial': 0, 'textformat': lambda p, v: (str(v))}
             }
         )
 
